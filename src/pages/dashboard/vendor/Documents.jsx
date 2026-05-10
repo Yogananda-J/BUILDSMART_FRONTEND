@@ -19,7 +19,8 @@ const Documents = () => {
     setLoading(true);
     try {
       const res = await getDocuments();
-      setDocuments(res.data || []);
+      const data = res.data?.data || res.data?.content || (Array.isArray(res.data) ? res.data : []);
+      setDocuments(data);
     } catch (err) {
       toast.error('Failed to load documents');
     } finally {

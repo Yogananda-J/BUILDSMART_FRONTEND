@@ -163,66 +163,97 @@ const SafetyTasks = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredTasks.map(task => (
-                  <tr key={task.taskId || task.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '1rem' }}>
-                      <div style={{ fontWeight: 600, color: '#1e293b', fontSize: '0.875rem' }}>{task.taskName}</div>
-                      <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: 4 }}>{task.description}</div>
-                    </td>
-                    <td style={{ padding: '1rem', fontSize: '0.85rem', color: '#64748b' }}>
-                      <div style={{ fontFamily: 'monospace', background: '#f1f5f9', padding: '0.1rem 0.4rem', borderRadius: 4, display: 'inline-block' }}>{task.referenceId || 'N/A'}</div>
-                    </td>
-                    <td style={{ padding: '1rem', fontSize: '0.85rem', color: '#64748b' }}>
-                      <div className="d-flex align-items-center gap-2">
-                        <FaCalendarAlt size={12} className="text-muted" />
-                        {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : '—'}
-                      </div>
-                    </td>
-                    <td style={{ padding: '1rem' }}>
-                      <select
-                        value={task.status}
-                        onChange={(e) => handleStatusChange(task.taskId || task.id, e.target.value)}
-                        style={{ 
-                          padding: '0.3rem 0.5rem', borderRadius: 8, border: 'none', fontSize: '0.75rem', 
-                          fontWeight: 700,
-                          background: task.status === 'COMPLETED' ? '#d1fae5' : task.status === 'REJECTED' ? '#fee2e2' : task.status === 'SUBMITTED' ? '#fef3c7' : '#dbeafe',
-                          color: task.status === 'COMPLETED' ? '#065f46' : task.status === 'REJECTED' ? '#991b1b' : task.status === 'SUBMITTED' ? '#92400e' : '#1e40af'
-                        }}
-                      >
-                        <option value="PENDING">Pending</option>
-                        <option value="SUBMITTED">Submitted</option>
-                        <option value="COMPLETED">Completed</option>
-                        <option value="REJECTED">Rejected</option>
-                      </select>
-                    </td>
-                    <td style={{ padding: '1rem', textAlign: 'right' }}>
-                      <div className="d-flex justify-content-end gap-2">
-                        <button
-                          onClick={() => { setSelectedTask(task); setShowInspection(true); }}
-                          className="btn btn-sm"
-                          style={{ padding: '0.35rem 0.75rem', background: '#ecfdf5', color: '#059669', border: 'none', borderRadius: '50rem', fontSize: '0.75rem', fontWeight: 600 }}
+                {filteredTasks.map(task => {
+                  const taskId = task.taskId || task.assignedTaskId || task.id;
+                  const refId = task.projectId || task.referenceId || taskId;
+                  let dateVal = task.dueDate || task.deadline || task.endDate;
+                  
+                  // Try to extract date from description if missing
+                  if (!dateVal && task.description && task.description.includes('Planned:')) {
+                    const match = task.description.match(/\d{4}-\d{2}-\d{2}/);
+                    if (match) dateVal = match[0];
+                  }
+
+                  const priority = (task.priority || 'MEDIUM').toUpperCase();
+                  const priorityColors = {
+                    HIGH: { bg: '#fee2e2', text: '#991b1b', label: 'High' },
+                    MEDIUM: { bg: '#fef3c7', text: '#92400e', label: 'Medium' },
+                    LOW: { bg: '#dbeafe', text: '#1e40af', label: 'Low' }
+                  };
+                  const pStyle = priorityColors[priority] || priorityColors.MEDIUM;
+
+                  return (
+                    <tr key={taskId} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '1.25rem 1rem' }}>
+                        <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.9rem', marginBottom: 4 }}>{task.taskName || task.title || 'Safety Task'}</div>
+                        <div style={{ fontSize: '0.8rem', color: '#475569', lineHeight: '1.4' }}>{task.description}</div>
+                      </td>
+                      <td style={{ padding: '1.25rem 1rem' }}>
+                        <div style={{ fontFamily: 'monospace', background: '#f1f5f9', padding: '0.2rem 0.6rem', borderRadius: 6, fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'inline-block' }}>
+                          {refId}
+                        </div>
+                      </td>
+                      <td style={{ padding: '1.25rem 1rem' }}>
+                        <div className="d-flex align-items-center gap-2" style={{ fontSize: '0.85rem', color: '#334155', fontWeight: 500 }}>
+                          <FaCalendarAlt size={12} style={{ color: '#6366f1' }} />
+                          {dateVal ? new Date(dateVal).toLocaleDateString() : 'No date'}
+                        </div>
+                      </td>
+                      <td style={{ padding: '1.25rem 1rem' }}>
+                        <span style={{ 
+                          padding: '0.25rem 0.75rem', borderRadius: '50rem', fontSize: '0.7rem', fontWeight: 700,
+                          background: pStyle.bg, color: pStyle.text, textTransform: 'uppercase'
+                        }}>
+                          {pStyle.label}
+                        </span>
+                      </td>
+                      <td style={{ padding: '1.25rem 1rem' }}>
+                        <select
+                          value={task.status}
+                          onChange={(e) => handleStatusChange(taskId, e.target.value)}
+                          className="form-select form-select-sm border-0 fw-bold rounded-pill shadow-sm"
+                          style={{ 
+                            width: 'fit-content', fontSize: '0.75rem',
+                            background: task.status === 'COMPLETED' ? '#d1fae5' : task.status === 'IN_PROGRESS' ? '#dbeafe' : '#f1f5f9',
+                            color: task.status === 'COMPLETED' ? '#065f46' : task.status === 'IN_PROGRESS' ? '#1e40af' : '#475569'
+                          }}
                         >
-                          Inspection
-                        </button>
-                        <button
-                          onClick={() => { setSelectedTask(task); setShowIncident(true); }}
-                          className="btn btn-sm"
-                          style={{ padding: '0.35rem 0.75rem', background: '#fef2f2', color: '#dc2626', border: 'none', borderRadius: '50rem', fontSize: '0.75rem', fontWeight: 600 }}
-                        >
-                          Incident
-                        </button>
-                        {task.status !== 'COMPLETED' && (
+                          <option value="PENDING">Pending</option>
+                          <option value="SUBMITTED">Submitted</option>
+                          <option value="COMPLETED">Completed</option>
+                          <option value="REJECTED">Rejected</option>
+                        </select>
+                      </td>
+                      <td style={{ padding: '1.25rem 1rem', textAlign: 'right' }}>
+                        <div className="d-flex justify-content-end gap-2">
                           <button
-                            onClick={() => openSubmitModal(task)}
-                            style={{ padding: '0.35rem 0.75rem', background: '#eef2ff', color: '#4f46e5', border: 'none', borderRadius: '50rem', fontSize: '0.75rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                            onClick={() => { setSelectedTask(task); setShowInspection(true); }}
+                            className="btn btn-sm shadow-sm"
+                            style={{ padding: '0.35rem 0.85rem', background: '#ecfdf5', color: '#059669', border: 'none', borderRadius: '50rem', fontSize: '0.75rem', fontWeight: 700 }}
                           >
-                            <FaCheckSquare size={10} /> Submit
+                            Inspection
                           </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          <button
+                            onClick={() => { setSelectedTask(task); setShowIncident(true); }}
+                            className="btn btn-sm shadow-sm"
+                            style={{ padding: '0.35rem 0.85rem', background: '#fef2f2', color: '#dc2626', border: 'none', borderRadius: '50rem', fontSize: '0.75rem', fontWeight: 700 }}
+                          >
+                            Incident
+                          </button>
+                          {task.status !== 'COMPLETED' && (
+                            <button
+                              onClick={() => openSubmitModal(task)}
+                              className="btn btn-sm shadow-sm"
+                              style={{ padding: '0.35rem 0.85rem', background: '#eef2ff', color: '#4f46e5', border: 'none', borderRadius: '50rem', fontSize: '0.75rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                            >
+                              <FaCheckSquare size={10} /> Submit
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -27,8 +27,10 @@ const Invoices = () => {
         getInvoices().catch(() => ({ data: [] })),
         getContracts().catch(() => ({ data: [] }))
       ]);
-      setInvoices(iRes.data || []);
-      setContracts(cRes.data?.data || cRes.data?.content || (Array.isArray(cRes.data) ? cRes.data : []));
+      const invData = iRes.data?.data || iRes.data?.content || (Array.isArray(iRes.data) ? iRes.data : []);
+      setInvoices(invData);
+      const conData = cRes.data?.data || cRes.data?.content || (Array.isArray(cRes.data) ? cRes.data : []);
+      setContracts(conData);
     } catch (err) {
       toast.error('Failed to load invoice data');
     } finally {

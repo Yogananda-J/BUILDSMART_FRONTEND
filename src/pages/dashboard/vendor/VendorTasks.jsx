@@ -15,7 +15,8 @@ const VendorTasks = () => {
     setLoading(true);
     try {
       const res = await getVendorTasks();
-      setTasks(res.data || []);
+      const data = res.data?.data || res.data?.content || (Array.isArray(res.data) ? res.data : []);
+      setTasks(data);
     } catch (err) {
       toast.error('Failed to load tasks');
     } finally {
@@ -81,35 +82,80 @@ const VendorTasks = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredTasks.map(task => (
-                  <tr key={task.taskId || task.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '1rem' }}>
-                      <div style={{ fontWeight: 600, color: '#1e293b', fontSize: '0.875rem' }}>{task.taskName}</div>
-                      <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: 4 }}>{task.description}</div>
-                    </td>
-                    <td style={{ padding: '1rem', fontSize: '0.85rem', color: '#64748b' }}>
-                      <div style={{ fontFamily: 'monospace', background: '#f1f5f9', padding: '0.1rem 0.4rem', borderRadius: 4, display: 'inline-block' }}>{task.referenceId || 'N/A'}</div>
-                    </td>
-                    <td style={{ padding: '1rem', fontSize: '0.85rem', color: '#64748b' }}>
-                      <div className="d-flex align-items-center gap-2">
-                        <FaCalendarAlt size={12} className="text-muted" />
-                        {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : '—'}
-                      </div>
-                    </td>
-                    <td style={{ padding: '1rem' }}><StatusBadge status={task.priority} size="sm" /></td>
-                    <td style={{ padding: '1rem' }}>
-                      <select
-                        value={task.status}
-                        onChange={(e) => handleStatusChange(task.taskId || task.id, e.target.value)}
-                        style={{ padding: '0.3rem 0.5rem', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: '0.75rem', background: '#f8fafc', fontWeight: 600, color: '#475569' }}
-                      >
-                        <option value="PENDING">Pending</option>
-                        <option value="IN_PROGRESS">In Progress</option>
-                        <option value="COMPLETED">Completed</option>
-                      </select>
-                    </td>
-                  </tr>
-                ))}
+                {filteredTasks.map(task => {
+                  const taskId = task.taskId || task.assignedTaskId || task.id;
+                  const refId = task.projectId || task.referenceId || taskId;
+                  let dateVal = task.dueDate || task.deadline || task.endDate || task.plannedEnd || task.plannedStart;
+                  
+                  if (!dateVal && task.description && task.description.includes('Planned:')) {
+                    const match = task.description.match(/\d{4}-\d{2}-\d{2}/);
+                    if (match) dateVal = match[0];
+                  }
+
+                  const priority = (task.priority || 'MEDIUM').toUpperCase();
+                  const priorityColors = {
+                    HIGH: { bg: '#fee2e2', text: '#991b1b', label: 'High' },
+                    MEDIUM: { bg: '#fef3c7', text: '#92400e', label: 'Medium' },
+                    LOW: { bg: '#dbeafe', text: '#1e40af', label: 'Low' }
+                  };
+                  const pStyle = priorityColors[priority] || priorityColors.MEDIUM;
+
+                  return (
+                    <tr key={taskId} style={{ borderBottom: '1px solid #f1f5f9', transition: 'all 0.2s' }} className="task-row-hover">
+                      <td style={{ padding: '1.5rem 1rem', width: '45%' }}>
+                        <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: 12, border: '1px solid #edf2f7' }}>
+                          <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '1.05rem', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <FaTasks style={{ color: '#6366f1' }} size={16} />
+                            {task.taskName || task.title || task.description?.split('.')[0] || 'Task Assignment'}
+                          </div>
+                          <div style={{ fontSize: '0.9rem', color: '#334155', lineHeight: '1.6', fontWeight: 500 }}>
+                            {task.description}
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{ padding: '1.5rem 1rem' }}>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Reference</div>
+                        <div style={{ fontFamily: 'monospace', background: '#fff', border: '1px solid #e2e8f0', padding: '0.4rem 0.75rem', borderRadius: 8, fontSize: '0.85rem', fontWeight: 700, color: '#475569', display: 'inline-block', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+                          {refId}
+                        </div>
+                      </td>
+                      <td style={{ padding: '1.5rem 1rem' }}>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Due Date</div>
+                        <div className="d-flex align-items-center gap-2" style={{ fontSize: '0.95rem', color: '#1e293b', fontWeight: 600 }}>
+                          <FaCalendarAlt size={14} style={{ color: '#6366f1' }} />
+                          {dateVal ? new Date(dateVal).toLocaleDateString() : 'No date'}
+                        </div>
+                      </td>
+                      <td style={{ padding: '1.5rem 1rem' }}>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Priority</div>
+                        <span style={{ 
+                          padding: '0.4rem 1rem', borderRadius: '50rem', fontSize: '0.75rem', fontWeight: 800,
+                          background: pStyle.bg, color: pStyle.text, textTransform: 'uppercase', boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+                        }}>
+                          {pStyle.label}
+                        </span>
+                      </td>
+                      <td style={{ padding: '1.5rem 1rem' }}>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Update Status</div>
+                        <select
+                          value={task.status}
+                          onChange={(e) => handleStatusChange(taskId, e.target.value)}
+                          className="form-select form-select-sm border-0 fw-bold rounded-pill shadow-sm"
+                          style={{ 
+                            width: 'fit-content', fontSize: '0.8rem', height: 38, paddingLeft: '1rem', paddingRight: '2.5rem',
+                            background: (task.status?.toUpperCase() === 'COMPLETED' || task.status?.toUpperCase() === 'DONE') ? '#d1fae5' : (task.status?.toUpperCase() === 'IN_PROGRESS' || task.status?.toUpperCase() === 'DOING') ? '#dbeafe' : '#fff',
+                            color: (task.status?.toUpperCase() === 'COMPLETED' || task.status?.toUpperCase() === 'DONE') ? '#065f46' : (task.status?.toUpperCase() === 'IN_PROGRESS' || task.status?.toUpperCase() === 'DOING') ? '#1e40af' : '#475569',
+                            border: '1px solid #e2e8f0 !important'
+                          }}
+                        >
+                          <option value="PENDING">Pending</option>
+                          <option value="IN_PROGRESS">In Progress</option>
+                          <option value="COMPLETED">Completed</option>
+                        </select>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { getContracts, createContract, updateContract } from '../../../api/vendorApi';
+import { getContracts, createContract, updateContract, getVendorTasks } from '../../../api/vendorApi';
+import { getProjects } from '../../../api/projectApi';
 import { toast } from '../../../utils/toast';
 import StatusBadge from '../../../components/common/StatusBadge';
 import StatCard from '../../../components/common/StatCard';
@@ -26,13 +27,24 @@ const Contracts = () => {
     setLoading(true);
     try {
       const [cRes, pRes, vRes] = await Promise.all([
-        getContracts().catch(() => ({ data: [] })),
-        getProjects().catch(() => ({ data: [] })),
-        getVendorTasks().catch(() => ({ data: [] }))
+        getContracts().catch(err => { console.error('Contracts load failed:', err); return { data: [] }; }),
+        getProjects().catch(err => { console.error('Projects load failed:', err); return { data: [] }; }),
+        getVendorTasks().catch(err => { console.error('Vendor Tasks load failed:', err); return { data: [] }; })
       ]);
-      setContracts(cRes.data?.data || cRes.data?.content || (Array.isArray(cRes.data) ? cRes.data : []));
-      setProjects(pRes.data || []);
-      setVendorTasks(vRes.data || []);
+      
+      const cData = cRes.data?.data || cRes.data?.content || (Array.isArray(cRes.data) ? cRes.data : []);
+      setContracts(cData);
+      
+      let projList = pRes.data?.data || pRes.data?.content || (Array.isArray(pRes.data) ? pRes.data : []);
+      const vTasks = vRes.data?.data || vRes.data?.content || (Array.isArray(vRes.data) ? vRes.data : []);
+      setVendorTasks(vTasks);
+
+      // Fallback: If projects list is empty/restricted, build from tasks
+      if (projList.length === 0 && vTasks.length > 0) {
+        const uniqueProjectIds = [...new Set(vTasks.map(t => t.projectId))];
+        projList = uniqueProjectIds.map(id => ({ projectId: id, projectName: id }));
+      }
+      setProjects(projList);
     } catch (err) {
       toast.error('Failed to load contract data');
     } finally {
@@ -42,21 +54,44 @@ const Contracts = () => {
 
   useEffect(() => { fetchData(); }, []);
 
+  // Re-fetch when modal opens to ensure latest tasks are shown
+  useEffect(() => {
+    if (showCreate) fetchData();
+  }, [showCreate]);
+
+  const handleTaskChange = (taskId) => {
+    if (!taskId) {
+      setForm({ ...form, taskId: '' });
+      return;
+    }
+    const selectedTask = vendorTasks.find(t => (t.assignedTaskId === taskId || t.taskId === taskId || t.id === taskId));
+    if (selectedTask) {
+      setForm({ ...form, taskId, projectId: selectedTask.projectId });
+    } else {
+      setForm({ ...form, taskId });
+    }
+  };
+
   const handleCreate = async (e) => {
     e.preventDefault();
     setSubmitting(true);
     const payload = {
-      ...form,
-      value: Number(form.value)
+      projectId: form.projectId,
+      taskId: form.taskId,
+      value: Number(form.value),
+      startDate: form.startDate,
+      endDate: form.endDate,
+      status: 'DRAFT'
     };
     try {
       await createContract(payload);
-      toast.success('Contract created and sent for PM approval');
+      toast.success('Contract proposal submitted');
       setShowCreate(false);
       setForm({ projectId: '', taskId: '', value: '', startDate: '', endDate: '', status: 'DRAFT' });
       fetchData();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to create contract');
+      const errorMsg = err.response?.data?.details || err.response?.data?.message || 'Failed to create contract';
+      toast.error(errorMsg);
     } finally {
       setSubmitting(false);
     }
@@ -187,6 +222,22 @@ const Contracts = () => {
         </Modal.Header>
         <Modal.Body className="p-4">
           <Form onSubmit={handleCreate}>
+            <div className="mb-3">
+              <Form.Label className="small fw-bold text-uppercase opacity-75">Link to Assigned Task (Auto-fills Project)</Form.Label>
+              <Form.Select value={form.taskId} onChange={e => handleTaskChange(e.target.value)} className="form-control border-0 bg-light p-3 rounded-4 shadow-none" style={{ height: 56 }}>
+                <option value="">No task link (Manual selection)</option>
+                {vendorTasks.map(t => {
+                  const tId = t.taskId || t.assignedTaskId || t.id;
+                  const tName = t.taskName || t.title || t.description?.split('.')[0] || 'Untitled Task';
+                  return (
+                    <option key={tId} value={tId}>
+                      {tId} — {tName} ({t.projectId})
+                    </option>
+                  );
+                })}
+              </Form.Select>
+            </div>
+
             <div className="row g-3 mb-3">
               <div className="col-md-6">
                 <Form.Label className="small fw-bold text-uppercase opacity-75">Target Project</Form.Label>
@@ -199,18 +250,6 @@ const Contracts = () => {
                 <Form.Label className="small fw-bold text-uppercase opacity-75">Contract Value (₹)</Form.Label>
                 <Form.Control type="number" value={form.value} onChange={e => setForm({ ...form, value: e.target.value })} required className="form-control border-0 bg-light p-3 rounded-4" style={{ height: 56 }} placeholder="0.00" />
               </div>
-            </div>
-
-            <div className="mb-3">
-              <Form.Label className="small fw-bold text-uppercase opacity-75">Link to Assigned Task (Optional)</Form.Label>
-              <Form.Select value={form.taskId} onChange={e => setForm({ ...form, taskId: e.target.value })} className="form-control border-0 bg-light p-3 rounded-4 shadow-none" style={{ height: 56 }}>
-                <option value="">No task link</option>
-                {vendorTasks.filter(t => !form.projectId || t.projectId === form.projectId).map(t => (
-                  <option key={t.assignedTaskId} value={t.assignedTaskId}>
-                    {t.assignedTaskId} — {t.description}
-                  </option>
-                ))}
-              </Form.Select>
             </div>
 
             <div className="row g-3 mb-4">

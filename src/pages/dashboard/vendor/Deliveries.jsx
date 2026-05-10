@@ -23,7 +23,8 @@ const Deliveries = () => {
     setLoading(true);
     try {
       const res = await getDeliveries();
-      setDeliveries(res.data || []);
+      const data = res.data?.data || res.data?.content || (Array.isArray(res.data) ? res.data : []);
+      setDeliveries(data);
     } catch (err) {
       toast.error('Failed to load deliveries');
     } finally {
